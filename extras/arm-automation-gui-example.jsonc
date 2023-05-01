@@ -1,0 +1,258 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "deploymentScriptIdentityName": {
+      "type": "string",
+      "defaultValue": "automation-gui-deploy-identity",
+      "metadata": {
+        "description": "Name of the Managed Identity created in the pre-deploy steps."
+      }
+    },
+    "appRegistrationName": {
+      "type": "string",
+      "defaultValue": "automation-gui-example",
+      "metadata": {
+        "description": "Name for the App Registration created during deployment."
+      }
+    },
+    "storageAccountName": {
+      "type": "string",
+      "defaultValue": "[concat('automationguiexample', substring(uniqueString(subscription().subscriptionId),0,4))]",
+      "metadata": {
+        "description": "Name for the Storage Account resource."
+      }
+    },
+    "automationAccountName": {
+      "type": "string",
+      "defaultValue": "[concat('automation-gui-example-', substring(uniqueString(subscription().subscriptionId),0,4))]",
+      "metadata": {
+        "description": "Name for the Automation Account resource."
+      }
+    },
+	  "automationWebhookExpiryTime": {
+      	"type": "string",
+      	"defaultValue": "[dateTimeAdd(utcNow('u'), 'P1Y')]",
+        "metadata": {
+          "description": "DO NOT CHANGE. Expiry time (now +1 year) for the Runbook web hooks used by the Static Web App API."
+      }
+    },
+    "staticWebAppName": {
+      "type": "string",
+      "defaultValue": "automation-gui-example",
+      "metadata": {
+        "description": "Name for the Static Web App resource."
+      }
+    },
+    "githubRepositoryURL": {
+      "type": "string",
+      "defaultValue": "https://github.com/<account>/az-automation-gui-example",
+      "metadata": {
+        "description": "URL for the Github respository used for deployment."
+      }
+    }
+  },
+  "variables": {
+    "appRegistraionNameArgument": "[concat('\"', parameters('appRegistrationName'), '\"')]"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Resources/deploymentScripts",
+      "apiVersion": "2020-10-01",
+      "name": "automation-gui-deploy-script",
+      "location": "[resourceGroup().location]",
+      "kind": "AzurePowerShell",
+      "identity": {
+        "type": "UserAssigned",
+        "userAssignedIdentities": {
+          "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('deploymentScriptIdentityName'))]": {}
+        }
+      },
+      "properties": {
+        "forceUpdateTag": "1",
+        "azPowerShellVersion": "8.3",
+        "scriptContent": "param([string] $Name); Connect-AzAccount -Identity; $Sp = New-AzADServicePrincipal -DisplayName $Name; $DeploymentScriptOutputs = @{'ClientId' = $Sp.AppId; 'ClientSecret' = $Sp.PasswordCredentials.SecretText};",
+        "arguments": "[concat('-Name ', variables('appRegistraionNameArgument'))]",
+        "timeout": "PT1H",
+        "cleanupPreference": "OnSuccess",
+        "retentionInterval": "P1D"
+      }
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts",
+      "apiVersion": "2022-09-01",
+      "name": "[parameters('storageAccountName')]",
+      "location": "[resourceGroup().location]",
+      "sku": {
+        "name": "Standard_LRS"
+      },
+      "kind": "StorageV2",
+      "resources": [
+        {
+          "type": "tableServices/tables",
+          "apiVersion": "2022-09-01",
+          "name": "default/formData",
+          "properties": {},
+          "dependsOn": [
+            "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccountName'))]"
+          ]
+        }
+      ]
+    },
+		{
+      "type": "Microsoft.Automation/automationAccounts",
+      "apiVersion": "2022-08-08",
+      "name": "[parameters('automationAccountName')]",
+      "location": "[resourceGroup().location]",
+      "identity": {
+        "type": "SystemAssigned"
+      },
+      "properties": {
+        "sku": {
+        "name": "Basic"
+        }
+      },
+      "resources": [
+        {
+          "type": "hybridRunbookWorkerGroups",
+          "apiVersion": "2022-08-08",
+          "name": "[parameters('automationAccountName')]",
+          "dependsOn": [
+            "[resourceId('Microsoft.Automation/automationAccounts', parameters('automationAccountName'))]"
+          ]
+        },
+        {
+          "type": "runbooks",
+          "apiVersion": "2022-08-08",
+          "name": "automation-gui-example",
+          "location": "[resourceGroup().location]",
+          "dependsOn": [
+            "[resourceId('Microsoft.Automation/automationAccounts', parameters('automationAccountName'))]"
+          ],
+          "properties": {
+            "runbookType": "PowerShell",
+            "description": "",
+            "publishContentLink": {
+              "uri": "https://raw.githubusercontent.com/chrisred/az-automation-gui-example/master/extras/RunbookExample.ps1",
+              "version": "1.0.0.0"
+            }
+          }
+        },
+        {
+          "type": "webhooks",
+          "apiVersion": "2015-10-31",
+          "name": "automation-gui-example-api",
+          "dependsOn": [
+            "[resourceId('Microsoft.Automation/automationAccounts', parameters('automationAccountName'))]",
+            "[resourceId('Microsoft.Automation/automationAccounts/runbooks', parameters('automationAccountName'), 'automation-gui-example')]"
+          ],
+          "properties": {
+            "expiryTime": "[parameters('automationWebhookExpiryTime')]",
+            "isEnabled": true,
+            "parameters": {},
+            "runbook": {
+            "name": "automation-gui-example"
+            }
+          }
+        },
+        {
+          "type": "runbooks",
+          "apiVersion": "2022-08-08",
+          "name": "automation-gui-example-hybrid",
+          "location": "[resourceGroup().location]",
+          "dependsOn": [
+            "[resourceId('Microsoft.Automation/automationAccounts', parameters('automationAccountName'))]"
+          ],
+          "properties": {
+            "runbookType": "PowerShell",
+            "description": "",
+            "publishContentLink": {
+              "uri": "https://raw.githubusercontent.com/chrisred/az-automation-gui-example/master/extras/HybridExample.ps1",
+              "version": "1.0.0.0"
+            }
+          }
+        },
+        {
+          "type": "webhooks",
+          "apiVersion": "2015-10-31",
+          "name": "automation-gui-example-hybrid-api",
+          "dependsOn": [
+            "[resourceId('Microsoft.Automation/automationAccounts', parameters('automationAccountName'))]",
+            "[resourceId('Microsoft.Automation/automationAccounts/runbooks', parameters('automationAccountName'), 'automation-gui-example-hybrid')]",
+            "[resourceId('Microsoft.Automation/automationAccounts/hybridRunbookWorkerGroups', parameters('automationAccountName'), parameters('automationAccountName'))]"
+          ],
+          "properties": {
+            "expiryTime": "[parameters('automationWebhookExpiryTime')]",
+            "isEnabled": true,
+            "parameters": {},
+            "runbook": {
+            "name": "automation-gui-example-hybrid"
+            },
+            "runOn": "[parameters('automationAccountName')]"
+          }
+        },
+        {
+          "type": "runbooks",
+          "apiVersion": "2022-08-08",
+          "name": "automation-gui-example-sync",
+          "location": "[resourceGroup().location]",
+          "dependsOn": [
+            "[resourceId('Microsoft.Automation/automationAccounts', parameters('automationAccountName'))]"
+          ],
+          "properties": {
+            "runbookType": "PowerShell",
+            "description": "",
+            "publishContentLink": {
+              "uri": "https://raw.githubusercontent.com/chrisred/az-automation-gui-example/master/extras/HybridSyncJob.ps1",
+              "version": "1.0.0.0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "Microsoft.Web/staticSites",
+      "apiVersion": "2022-03-01",
+      "name": "[parameters('staticWebAppName')]",
+      "location": "[resourceGroup().location]",
+      "sku": {
+        "name": "Free",
+        "tier": "Free"
+      },
+      "properties": {
+        "repositoryUrl": "[parameters('githubRepositoryURL')]",
+        "branch": "master",
+        "stagingEnvironmentPolicy": "Enabled",
+        "allowConfigFileUpdates": true,
+        "provider": "GitHub",
+        "enterpriseGradeCdnStatus": "Disabled"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Resources/deploymentScripts', 'automation-gui-deploy-script')]"
+      ],
+      "resources": [
+        {
+          "type": "config",
+          "apiVersion": "2022-03-01",
+          "name": "appsettings",
+          "kind": "string",
+          "properties": {
+            "AUTOMATION_ACCOUNT_NAME": "[parameters('automationAccountName')]",
+            "AUTOMATION_GROUP_NAME": "[resourceGroup().name]",
+            "AZURE_CLIENT_ID": "[reference('automation-gui-deploy-script').outputs.ClientId]",
+            "AZURE_CLIENT_SECRET": "[reference('automation-gui-deploy-script').outputs.ClientSecret]",
+            "AZURE_SUBSCRIPTION_ID": "[subscription().subscriptionId]",
+            "AZURE_TENANT_ID": "[subscription().tenantId]",
+            "WEBHOOK_RUNBOOK": "[reference('automation-gui-example-api').uri]",
+            "WEBHOOK_HYBRID": "[reference('automation-gui-example-hybrid-api').uri]",
+            "STORAGE_CONNECTION_STRING": "[concat('DefaultEndpointsProtocol=https;AccountName=', parameters('storageAccountName'), ';AccountKey=', listKeys(parameters('storageAccountName'), '2022-09-01').keys[0].value)]"
+          },
+          "dependsOn": [
+            "[resourceId('Microsoft.Web/staticSites', parameters('staticWebAppName'))]",
+            "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccountName'))]"
+          ]
+        }
+      ]
+    }
+  ]
+}
