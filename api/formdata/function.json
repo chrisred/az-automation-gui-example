@@ -1,0 +1,29 @@
+{
+  "scriptFile": "__init__.py",
+  "bindings": [
+    {
+      "name": "req",
+      "type": "httpTrigger",
+      "authLevel": "function",
+      "direction": "in",
+      "methods": [
+        "get",
+        "post"
+      ],
+      "route": "formdata/{partition}"
+    },
+    {
+      "name": "data",
+      "type": "table",
+      "tableName": "FormData",
+      "partitionKey": "{partition}",
+      "connection": "STORAGE_CONNECTION_STRING",
+      "direction": "in"
+    },
+    {
+      "type": "http",
+      "direction": "out",
+      "name": "$return"
+    }
+  ]
+}
