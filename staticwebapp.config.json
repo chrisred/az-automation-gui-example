@@ -1,0 +1,17 @@
+{
+  "platform": {
+    "apiRuntime": "python:3.9"
+  },
+  "responseOverrides": {
+    "401": {
+      "statusCode": 302,
+      "redirect": "/.auth/login/aad"
+    }
+  },
+  "routes": [
+    {
+      "route": "/*",
+      "allowedRoles": [""]
+    }
+  ]
+}
