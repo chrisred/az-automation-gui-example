@@ -92,5 +92,5 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         return func.HttpResponse(response, status_code=200, mimetype='application/json')
 
     except Exception as e:
-        response = f'{{"error":"{repr(e)}"}}'
+        response = json.dumps({'error': repr(e)})
         return func.HttpResponse(response, status_code=500, mimetype='application/json')
