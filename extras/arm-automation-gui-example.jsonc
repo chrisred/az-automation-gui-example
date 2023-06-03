@@ -46,7 +46,7 @@
     },
     "githubRepositoryURL": {
       "type": "string",
-      "defaultValue": "https://github.com/<account>/az-automation-gui-example",
+      "defaultValue": "https://",
       "metadata": {
         "description": "URL for the Github respository used for deployment."
       }
@@ -71,12 +71,29 @@
       "properties": {
         "forceUpdateTag": "1",
         "azPowerShellVersion": "8.3",
-        "scriptContent": "param([string] $Name); Connect-AzAccount -Identity; $Sp = New-AzADServicePrincipal -DisplayName $Name; $DeploymentScriptOutputs = @{'ClientId' = $Sp.AppId; 'ClientSecret' = $Sp.PasswordCredentials.SecretText};",
+        "scriptContent": "param([string] $Name); Connect-AzAccount -Identity; $Sp = New-AzADServicePrincipal -DisplayName $Name; $DeploymentScriptOutputs = @{'PrincipalId' = $Sp.Id; 'ClientId' = $Sp.AppId; 'ClientSecret' = $Sp.PasswordCredentials.SecretText};",
         "arguments": "[concat('-Name ', variables('appRegistraionNameArgument'))]",
         "timeout": "PT1H",
         "cleanupPreference": "OnSuccess",
         "retentionInterval": "P1D"
-      }
+      },
+      "resources": [
+        {
+          // assign built-in "Reader" role to the App Registration
+          "type": "Microsoft.Authorization/roleAssignments",
+          "apiVersion": "2022-04-01",
+          "name": "[guid(resourceGroup().id, 'app-reader')]",
+          "dependsOn": [
+            "[resourceId('Microsoft.Resources/deploymentScripts', 'automation-gui-deploy-script')]"
+          ],
+          "properties": {
+            "roleDefinitionId": "[resourceId('Microsoft.Authorization/roleDefinitions', 'acdd72a7-3385-48ef-bd42-f606fba81ae7')]",
+            "principalId": "[reference('automation-gui-deploy-script').outputs.PrincipalId]",
+            "scope": "[resourceGroup().id]",
+            "principalType": "ServicePrincipal"
+          }
+        }
+      ]
     },
     {
       "type": "Microsoft.Storage/storageAccounts",
@@ -206,6 +223,21 @@
               "uri": "https://raw.githubusercontent.com/chrisred/az-automation-gui-example/master/extras/HybridSyncJob.ps1",
               "version": "1.0.0.0"
             }
+          }
+        },
+        {
+          // assign built-in "Reader and Data Access" role to the Automation Account managed identity
+          "type": "Microsoft.Authorization/roleAssignments",
+          "apiVersion": "2022-04-01",
+          "name": "[guid(resourceGroup().id, 'automation-readeranddataaccess')]",
+          "dependsOn": [
+            "[resourceId('Microsoft.Automation/automationAccounts', parameters('automationAccountName'))]"
+          ],
+          "properties": {
+            "roleDefinitionId": "[resourceId('Microsoft.Authorization/roleDefinitions', 'c12c1c16-33a1-487b-954d-41c89c60f349')]",
+            "principalId": "[reference(resourceId('Microsoft.Automation/automationAccounts', parameters('automationAccountName')), '2022-08-08', 'full').identity.principalId]",
+            "scope": "[resourceGroup().id]",
+            "principalType": "ServicePrincipal"
           }
         }
       ]
