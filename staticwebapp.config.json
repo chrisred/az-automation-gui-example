@@ -10,6 +10,14 @@
   },
   "routes": [
     {
+        "route": "/runbook",
+        "rewrite": "/index.html"
+    },
+    {
+        "route": "/hybrid",
+        "rewrite": "/index.html"
+    },
+    {
       "route": "/*",
       "allowedRoles": [""]
     }
