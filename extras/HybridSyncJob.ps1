@@ -1,6 +1,6 @@
 Param(
-    [string]$ResourceGroupName,
-    [string]$StorageAccountName
+    [Parameter(Mandatory)][string]$ResourceGroupName,
+    [Parameter(Mandatory)][string]$StorageAccountName
 )
 
 $global:ErrorActionPreference = 'Stop'

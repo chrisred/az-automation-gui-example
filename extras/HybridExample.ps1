@@ -22,12 +22,12 @@ try
     $User = Get-LocalUser -Name $Username -EA 'SilentlyContinue'
     if ($null -eq $User) {throw "Failed to create user."}
 
-    # get group names from SID
-    $GroupNames = $Groups | foreach {(Get-LocalGroup -SID $_).Name}
+    # get group names from SID and filter for $null in pipeline iteration
+    $GroupNames = $Groups | where {$_} | foreach {(Get-LocalGroup -SID $_).Name}
     Write-Output "Adding user to the following group(s): $($GroupNames -join ', ')"
     Write-Output ""
 
-    $Groups | foreach {Add-LocalGroupMember -SID $_ -Member $User}
+    $Groups | where {$_} | foreach {Add-LocalGroupMember -SID $_ -Member $User}
     Write-Output "User created successfully."
 
     $User | fl * | Out-String
