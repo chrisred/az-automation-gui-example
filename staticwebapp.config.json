@@ -8,15 +8,10 @@
       "redirect": "/.auth/login/aad"
     }
   },
+  "navigationFallback": {
+    "rewrite": "/index.html"
+  },
   "routes": [
-    {
-        "route": "/runbook",
-        "rewrite": "/index.html"
-    },
-    {
-        "route": "/hybrid",
-        "rewrite": "/index.html"
-    },
     {
       "route": "/*",
       "allowedRoles": [""]
