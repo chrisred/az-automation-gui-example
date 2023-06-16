@@ -1,6 +1,6 @@
 # Azure Automation GUI
 
-A Web App front end for Azure Automation Runbooks. Give users a custom interface to trigger automation tasks. Based on the [Azure Static Web Apps](https://learn.microsoft.com/en-us/azure/static-web-apps/overview) (SWA) Free plan.
+A Web App front end for Azure Automation Runbooks. Use this project as a starting point for developing custom interfaces to trigger automation tasks. Based on the [Azure Static Web Apps](https://learn.microsoft.com/en-us/azure/static-web-apps/overview) (SWA) Free plan.
 
 ![Automation GUI](extras/images/runbook-large.png)
 
@@ -12,7 +12,7 @@ Steps to create the example application.
 
 1. Fork this repository in Github. It can be made private if wanted.
 2. Create a Resource Group in Azure as a target for the ARM template deployment. These steps use a group named `automation-gui-example`.
-3. Assign a Managed Identity permissions to create App Registrations with the following steps. This is used by the ARM template during deployment.
+3. Assign a Managed Identity permissions to create an App Registration with the following steps. This is used by the ARM template during deployment.
 
     1. Open a PowerShell Cloud Shell session and run the commands below to create the Managed Identity in the Resource Group.
     
@@ -62,12 +62,12 @@ Default values are assigned for most of the template parameters. The default val
 
 Hybrid jobs can run on an Azure VM, or on an externally hosted server when it is connected using Azure Arc. This is one method to access services or data not managed by Azure.
 
-The example creates a local user account and syncs the local group names to an Azure Table so the "User Groups" drop-down list component can be populated. A Windows based Hybrid Worker is required to execute the jobs.
+The example creates a local Windows user account and syncs the local group names to an Azure Table so the "User Groups" drop-down list component can be populated. A Windows based Hybrid Worker is required to execute the jobs.
 
 1. If using an external server follow the instructions to [add a server to Azure Arc](https://learn.microsoft.com/en-us/azure/azure-arc/servers/onboard-portal). This can be skipped for Azure hosted VMs.
 2. Configure the server as a Hybrid Worker by [adding it to a Hybrid Worker group](https://learn.microsoft.com/en-us/azure/automation/extension-based-hybrid-runbook-worker-install#add-a-machine-to-a-hybrid-worker-group). A group named `automation-gui-example-[suffix]` is already present in the Automation Account.
 3. Start the Runbook named `automation-gui-example-sync`. Provide the name of the Resource Group and the Storage Account as parameters, and run it on the Hybrid Worker. Check the job status to ensure it ran successfully.
-4. Refresh the site to pickup the change, now the "Hybrid Runbook" option should run successfully and create a local user.
+4. Refresh the site to pickup the change, now the "Hybrid Runbook" option on the site can be used and should create a local user.
 
 ### Re-deploying the ARM Template
 
@@ -144,12 +144,12 @@ sudo dnf install npm python3.9 podman
 
 The [SWA CLI](https://azure.github.io/static-web-apps-cli/docs/cli/swa) tool is used to emulate the Static Web App locally. This automatically uses the [Azure Functions Core Tools](https://learn.microsoft.com/en-us/azure/azure-functions/functions-core-tools-reference) to emulate Functions.
 
-* `npx swa start http://localhost:5173 --run "npm run dev" --api-location api` runs the SWA directly from the Vite development server (Vite uses port `5173` by default). Use this to allow the Vue.js hot reload feature to work.
-* `npx swa build az-automation-gui` builds/bundles all the source files.
+* `npx swa start http://localhost:5173 --run "npm run dev" --api-location api` runs the SWA directly from the Vite development server (Vite uses port `5173` by default). Use this to get the Vue.js hot reload feature to work.
+* `npx swa build az-automation-gui` builds/bundles all the source files. 
 * `npx swa start ./dist --api-location api` starts the SWA emulator using the bundled files in `./dist`.
 * Ensure the Python "venv" is active when running the emulator so the correct python version and packages are available.
 
-The emulated SWA site will be available at `http://localhost:4280`.
+With either method the emulated SWA site will be available at `http://localhost:4280`.
 
 ### Test Data
 
