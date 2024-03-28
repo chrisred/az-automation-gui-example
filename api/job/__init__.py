@@ -61,6 +61,10 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
             }
 
             webhook_response = requests.request('POST', webhook_url, params=webhook_params, json=webhook_data)
+
+            if not webhook_response.ok:
+                raise RuntimeError(f"Unexpected response code from Runbook webhook ({webhook_response.status_code}).")
+
             # response to the webhook POST is JSON formatted containing the Automation job ID
             response = webhook_response.text
 
@@ -92,5 +96,5 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         return func.HttpResponse(response, status_code=200, mimetype='application/json')
 
     except Exception as e:
-        response = json.dumps({'error': repr(e)})
+        response = json.dumps({'error': str(e)})
         return func.HttpResponse(response, status_code=500, mimetype='application/json')

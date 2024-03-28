@@ -83,7 +83,8 @@
 
     const response = await fetch('/api/job/submit', options)
     const responseBody = await response.json()
-    return responseBody
+
+    return {body: responseBody, status: response.status, statusText: response.statusText, ok: response.ok}
   }
 
   async function getJobStatus(jobId)
@@ -234,8 +235,10 @@
         }
 
         const jobResponse = await submitJob(requestBody)
-        const jobStatusResponse = await getJobStatus(jobResponse.JobIds[0])
-        console.log(`Job Id ${jobResponse.JobIds[0]}`)
+        if (!jobResponse.ok) {throw new Error(jobResponse.body.error)}
+
+        const jobStatusResponse = await getJobStatus(jobResponse.body.JobIds[0])
+        console.log(`Job Id ${jobResponse.body.JobIds[0]}`)
 
         // show info alert with initial job status
         writeAlertMessage('Job Status:', jobStatusResponse.status)
@@ -243,7 +246,7 @@
         alertType.value = 'info'
 
         // setup poller functions
-        const jobPoller = () => getJobDetails(jobResponse.JobIds[0])
+        const jobPoller = () => getJobDetails(jobResponse.body.JobIds[0])
         const jobCondition = pollResponse => isJobRunning(pollResponse.status) 
         const jobUpdater = createJobUpdater()
 
