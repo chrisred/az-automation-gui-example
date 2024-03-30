@@ -1,16 +1,28 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, provide } from 'vue'
 import { RouterView } from 'vue-router'
 
 const theme = ref('light')
 const isAuthenticated = ref(false)
 const userDetails = ref(null)
 const avatarUrl = ref(null)
-let snackbarError = ref(false)
-let errorMessage = ref(null)
+const snackbarBinding = ref(false)
+const snackbarColor = ref(null)
+const snackbarTimeout = ref(-1)
+const snackbarMessage = ref(null)
+
+provide('writeSnackbarMessage', writeSnackbarMessage)
 
 function onClickTheme () {
   theme.value = theme.value === 'light' ? 'dark' : 'light'
+}
+
+function writeSnackbarMessage(message, color, timeout)
+{
+  snackbarBinding.value = true
+  snackbarMessage.value = message
+  snackbarColor.value = color
+  snackbarTimeout.value = timeout
 }
 
 async function getUser()
@@ -38,9 +50,8 @@ async function getUser()
   }
   catch (e)
   {
-    snackbarError.value = true
-    errorMessage.value = e.message
     console.error(e)
+    writeSnackbarMessage(e.message, 'error', -1)
   }
 })()
 </script>
@@ -77,10 +88,10 @@ async function getUser()
     </v-navigation-drawer>
     <v-main>
       <router-view />
-      <v-snackbar v-model="snackbarError" color="error" multi-line>
-        {{ errorMessage }}
+      <v-snackbar v-model="snackbarBinding" :color="snackbarColor" :timeout="snackbarTimeout" multi-line>
+        {{ snackbarMessage }}
         <template v-slot:actions>
-          <v-btn variant="text" @click="snackbarError=false">Close</v-btn>
+          <v-btn variant="text" @click="snackbarBinding=false">Close</v-btn>
         </template>
       </v-snackbar>
     </v-main>
