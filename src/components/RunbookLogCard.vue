@@ -1,7 +1,8 @@
 <script setup>
-  import { ref, onMounted, onBeforeUnmount } from 'vue'
+  import { ref, inject, onMounted, onBeforeUnmount } from 'vue'
   import { useGoTo } from 'vuetify'
 
+  const writeSnackbarMessage = inject('writeSnackbarMessage')
   const props = defineProps({ messages: { type: Array, required: true }})
   const goTo = useGoTo()
   const resizeEvent = new ResizeObserver(onResize)
@@ -29,6 +30,24 @@
       goTo(targetOffset, {container: '#logging-container', duration:0, offset:32})
     }
   }
+
+  async function copyLog()
+  {
+    try
+    {
+      const logLines = logCard.value.$el.getElementsByTagName('li')
+      // lines with only whitespace are replaced with an empty string to avoide duplicate newlines
+      const logText = Array.from(logLines, ({textContent}) => textContent.replace(/^\s+$/,'')).join('\n')
+
+      await navigator.clipboard.writeText(logText)
+      writeSnackbarMessage('Log copied to clipboard.', 'success', 3000)
+    }
+    catch (e)
+    {
+      console.error(e)
+      writeSnackbarMessage(e.message, 'error', -1)
+    }
+  }
 </script>
 
 <template>
@@ -52,6 +71,7 @@
     </v-container>
     <v-card-actions>
       <v-spacer />
+      <v-btn variant="text" @click="copyLog">Copy</v-btn>
       <v-btn variant="text" @click="$emit('clear')">Clear</v-btn>
     </v-card-actions>
   </v-card>
