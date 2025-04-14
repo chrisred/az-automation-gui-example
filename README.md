@@ -97,10 +97,10 @@ Windows is not covered here, however after the prerequisites are installed the s
 
 ### Prerequisites
 
-Node.js, npm, Python 3.9 and Podman (or Docker) are required. For example:
+Node.js, npm, Python 3.10 and Podman (or Docker) are required. For example:
 
 ```sh
-sudo dnf install npm python3.9 podman
+sudo dnf install npm python3.10 podman
 ```
 
 ### Setup
@@ -108,7 +108,7 @@ sudo dnf install npm python3.9 podman
 1. Make a local clone (`git clone`) of the forked repository created in the [deployment](#resource-deployment) steps.
 2. `cd` to the `az-automation-gui-example` directory.
 3. Run `npm install` to install the Node.js package dependencies.
-4. Run `python3.9 -m venv api/.venv` to create a Python virtual environment (venv) for the Azure Functions API.
+4. Run `python3.10 -m venv api/.venv` to create a Python virtual environment (venv) for the Azure Functions API.
 5. Activate the venv with `source api/.venv/bin/activate`.
 6. Run `pip install -r api/requirements.txt` to install the Python package dependencies.
 7. Use the container option to run the [Azurite storage emulator](https://learn.microsoft.com/en-us/azure/storage/common/storage-use-azurite?tabs=docker-hub), and set a folder with `-v` to save the Azurite data into. For example:
