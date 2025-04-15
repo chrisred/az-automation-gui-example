@@ -105,7 +105,8 @@
   {
     const response = await fetch(`/api/job/status/${jobId}`)
     const responseBody = await response.json()
-    return responseBody
+
+    return {body: responseBody, status: response.status, statusText: response.statusText, ok: response.ok}
   }
 
   async function getJobOutput(jobId)
@@ -253,12 +254,13 @@
 
         const jobResponse = await submitJob(requestBody)
         if (!jobResponse.ok) {throw new Error(jobResponse.body.error)}
-
-        const jobStatusResponse = await getJobStatus(jobResponse.body.JobIds[0])
         console.log(`Job Id ${jobResponse.body.JobIds[0]}`)
 
+        const jobStatusResponse = await getJobStatus(jobResponse.body.JobIds[0])
+        if (!jobStatusResponse.ok) {throw new Error(jobStatusResponse.body.error)}
+
         // show info alert with initial job status
-        writeAlertMessage('Job Status:', jobStatusResponse.status)
+        writeAlertMessage('Job Status:', jobStatusResponse.body.status)
         alertDisplay.value = true
         alertType.value = 'info'
 
