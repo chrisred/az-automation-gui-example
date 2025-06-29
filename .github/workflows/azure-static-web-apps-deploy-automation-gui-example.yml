@@ -1,61 +1,77 @@
-# This workflow will build and push a web application to an Azure Static Web App when you change your code.
-#
-# This workflow assumes you have already created the target Azure Static Web App.
-# For instructions see https://docs.microsoft.com/azure/static-web-apps/get-started-portal?tabs=vanilla-javascript
-#
-# To configure this workflow:
-#
-# 1. Set up a secret in your repository named AZURE_STATIC_WEB_APPS_API_TOKEN with the value of your Static Web Apps deployment token.
-#    For instructions on obtaining the deployment token see: https://docs.microsoft.com/azure/static-web-apps/deployment-token-management
-#
-# 3. Change the values for the APP_LOCATION, API_LOCATION and APP_ARTIFACT_LOCATION, AZURE_STATIC_WEB_APPS_API_TOKEN environment variables (below).
-#    For instructions on setting up the appropriate configuration values go to https://docs.microsoft.com/azure/static-web-apps/front-end-frameworks
 name: Deploy automation-gui-example
 
 on:
   push:
-    branches: [ "master" ]
+    branches: [ master ]
   pull_request:
     types: [opened, synchronize, reopened, closed]
-    branches: [ "master" ]
-
-# Environment variables available to all jobs and steps in this workflow
-env:
-  APP_LOCATION: "/" # location of your client code
-  API_LOCATION: "api" # location of your api source code - optional
-  APP_ARTIFACT_LOCATION: "dist" # location of client code build output
-  AZURE_STATIC_WEB_APPS_API_TOKEN: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }} # secret containing deployment token for your static web app
-
+    branches: [ master ]
 permissions:
   contents: read
 
 jobs:
-  build_and_deploy_job:
+  # deploy the Static Web App code including a Managed Function when enabled
+  swa-build-and-deploy:
     permissions:
-      contents: read # for actions/checkout to fetch code
-      pull-requests: write # for repo to comment on PRs
+      contents: read
+      pull-requests: write
     if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.action != 'closed')
     runs-on: ubuntu-latest
-    name: Build and Deploy Job
+    name: SWA Build and Deploy
     steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: true
+      # deploy a Managed Function with this job when the AZURE_FUNCTIONAPP_NAME repo variable is not set
+      - name: Set Managed Function api_location
+        if: ${{ !vars.AZURE_FUNCTIONAPP_NAME }}
+        run: echo "API_LOCATION=api" >> $GITHUB_ENV
+      # deploy a "Bring your own" Function in a separate job, this job will skip any Function deployment
+      - name: Set BYO Function api_location
+        if: vars.AZURE_FUNCTIONAPP_NAME
+        run: echo "API_LOCATION=" >> $GITHUB_ENV
+      - name: Checkout source
+        uses: actions/checkout@v4
       - name: Build And Deploy
-        id: builddeploy
         uses: Azure/static-web-apps-deploy@v1
         with:
-          azure_static_web_apps_api_token: ${{ env.AZURE_STATIC_WEB_APPS_API_TOKEN }} # secret containing api token for app
-          repo_token: ${{ secrets.GITHUB_TOKEN }} # Used for Github integrations (i.e. PR comments)
-          action: "upload"
-          ###### Repository/Build Configurations - These values can be configured to match you app requirements. ######
-          # For more information regarding Static Web App workflow configurations, please visit: https://aka.ms/swaworkflowconfig
-          app_location: ${{ env.APP_LOCATION }}
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: upload
+          app_location: .
           api_location: ${{ env.API_LOCATION }}
-          app_artifact_location: ${{ env.APP_ARTIFACT_LOCATION }}
-          ###### End of Repository/Build Configurations ######
+          app_artifact_location: ./dist
 
-  close_pull_request_job:
+  # deploy a Function App for the API when the "Bring your own" Function option is configured
+  api-build-and-deploy:
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+    # if AZURE_FUNCTIONAPP_NAME has been set we are deploying Function App
+    if: vars.AZURE_FUNCTIONAPP_NAME && (github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.action != 'closed'))
+    runs-on: ubuntu-latest
+    name: API Build and Deploy
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+      - name: Resolve Python dependencies
+        shell: bash
+        run: |
+          pushd './api'
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt --target=".python_packages/lib/site-packages"
+          popd
+      - name: Authenticate with Azure tenant
+        uses: Azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Run the Azure Functions action
+        uses: Azure/functions-action@v1
+        with:
+          app-name: ${{ vars.AZURE_FUNCTIONAPP_NAME }}
+          package: ./api
+
+  close-pull-request:
     permissions:
       contents: none
     if: github.event_name == 'pull_request' && github.event.action == 'closed'
@@ -63,8 +79,7 @@ jobs:
     name: Close Pull Request Job
     steps:
       - name: Close Pull Request
-        id: closepullrequest
         uses: Azure/static-web-apps-deploy@v1
         with:
-          azure_static_web_apps_api_token: ${{ env.AZURE_STATIC_WEB_APPS_API_TOKEN }}
-          action: "close"
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          action: close
