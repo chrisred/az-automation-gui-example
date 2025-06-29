@@ -1,0 +1,431 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.36.1.42791",
+      "templateHash": "18362799088205260297"
+    }
+  },
+  "parameters": {
+    "staticWebAppRegion": {
+      "type": "string",
+      "allowedValues": [
+        "eastus2",
+        "centralus",
+        "westus2",
+        "westeurope",
+        "eastasia"
+      ],
+      "metadata": {
+        "description": "Region for the Static Web App (SWA Managed Function supported regions), other resources will deploy to the same region as the target resource group."
+      }
+    },
+    "storageAccountName": {
+      "type": "string",
+      "defaultValue": "[format('stautoguiexample{0}', substring(uniqueString(resourceGroup().id), 0, 5))]",
+      "metadata": {
+        "description": "Name for the Storage Account resource."
+      }
+    },
+    "appServicePlanName": {
+      "type": "string",
+      "defaultValue": "asp-automation-gui-example",
+      "metadata": {
+        "description": "Name for the App Service plan resource."
+      }
+    },
+    "functionAppName": {
+      "type": "string",
+      "defaultValue": "func-automation-gui-example",
+      "metadata": {
+        "description": "Name for the Function App resource."
+      }
+    },
+    "automationAccountName": {
+      "type": "string",
+      "defaultValue": "aa-automation-gui-example",
+      "metadata": {
+        "description": "Name for the Automation Account resource."
+      }
+    },
+    "runbookWebhookExpiryTime": {
+      "type": "string",
+      "defaultValue": "[dateTimeAdd(utcNow('u'), 'P1Y')]",
+      "metadata": {
+        "description": "DO NOT CHANGE. Expiry time (now +1 year) for the Runbook web hooks used by the Static Web App API."
+      }
+    },
+    "staticWebAppName": {
+      "type": "string",
+      "defaultValue": "stapp-automation-gui-example",
+      "metadata": {
+        "description": "Name for the Static Web App resource."
+      }
+    },
+    "githubRepositoryURL": {
+      "type": "string",
+      "metadata": {
+        "description": "URL for the Github respository used for deployment."
+      }
+    },
+    "managedIdentityName": {
+      "type": "string",
+      "defaultValue": "id-automation-gui-example-deploy",
+      "metadata": {
+        "description": "Name for the Managed Identity resource used to deploy the Function App code."
+      }
+    }
+  },
+  "variables": {
+    "location": "[resourceGroup().location]",
+    "uniqueName": "[substring(uniqueString(resourceGroup().id), 0, 5)]"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Storage/storageAccounts/tableServices/tables",
+      "apiVersion": "2024-01-01",
+      "name": "[format('{0}/{1}/{2}', parameters('storageAccountName'), 'default', 'formData')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Storage/storageAccounts/tableServices', parameters('storageAccountName'), 'default')]"
+      ]
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts/blobServices/containers",
+      "apiVersion": "2024-01-01",
+      "name": "[format('{0}/{1}/{2}', parameters('storageAccountName'), 'default', format('app-package-{0}-{1}', parameters('functionAppName'), variables('uniqueName')))]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Storage/storageAccounts/blobServices', parameters('storageAccountName'), 'default')]"
+      ]
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts/tableServices",
+      "apiVersion": "2024-01-01",
+      "name": "[format('{0}/{1}', parameters('storageAccountName'), 'default')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccountName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts/blobServices",
+      "apiVersion": "2024-01-01",
+      "name": "[format('{0}/{1}', parameters('storageAccountName'), 'default')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccountName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Automation/automationAccounts/hybridRunbookWorkerGroups",
+      "apiVersion": "2023-11-01",
+      "name": "[format('{0}/{1}', parameters('automationAccountName'), 'automation-gui-example')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Automation/automationAccounts', parameters('automationAccountName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Automation/automationAccounts/runbooks",
+      "apiVersion": "2023-11-01",
+      "name": "[format('{0}/{1}', parameters('automationAccountName'), 'automation-gui-example')]",
+      "location": "[variables('location')]",
+      "properties": {
+        "runbookType": "PowerShell",
+        "description": "",
+        "publishContentLink": {
+          "uri": "https://raw.githubusercontent.com/chrisred/az-automation-gui-example/master/extras/RunbookExample.ps1",
+          "version": "1.0.0.0"
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Automation/automationAccounts', parameters('automationAccountName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Automation/automationAccounts/webhooks",
+      "apiVersion": "2015-10-31",
+      "name": "[format('{0}/{1}', parameters('automationAccountName'), 'automation-gui-example-api')]",
+      "properties": {
+        "expiryTime": "[parameters('runbookWebhookExpiryTime')]",
+        "isEnabled": true,
+        "parameters": {},
+        "runbook": {
+          "name": "automation-gui-example"
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Automation/automationAccounts', parameters('automationAccountName'))]",
+        "[resourceId('Microsoft.Automation/automationAccounts/runbooks', parameters('automationAccountName'), 'automation-gui-example')]"
+      ]
+    },
+    {
+      "type": "Microsoft.Automation/automationAccounts/runbooks",
+      "apiVersion": "2023-11-01",
+      "name": "[format('{0}/{1}', parameters('automationAccountName'), 'automation-gui-example-hybrid')]",
+      "location": "[variables('location')]",
+      "properties": {
+        "runbookType": "PowerShell",
+        "description": "",
+        "publishContentLink": {
+          "uri": "https://raw.githubusercontent.com/chrisred/az-automation-gui-example/master/extras/HybridExample.ps1",
+          "version": "1.0.0.0"
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Automation/automationAccounts', parameters('automationAccountName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Automation/automationAccounts/webhooks",
+      "apiVersion": "2015-10-31",
+      "name": "[format('{0}/{1}', parameters('automationAccountName'), 'automation-gui-example-hybrid-api')]",
+      "properties": {
+        "expiryTime": "[parameters('runbookWebhookExpiryTime')]",
+        "isEnabled": true,
+        "parameters": {},
+        "runbook": {
+          "name": "automation-gui-example-hybrid"
+        },
+        "runOn": "[parameters('automationAccountName')]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Automation/automationAccounts', parameters('automationAccountName'))]",
+        "[resourceId('Microsoft.Automation/automationAccounts/runbooks', parameters('automationAccountName'), 'automation-gui-example-hybrid')]"
+      ]
+    },
+    {
+      "type": "Microsoft.Automation/automationAccounts/runbooks",
+      "apiVersion": "2023-11-01",
+      "name": "[format('{0}/{1}', parameters('automationAccountName'), 'automation-gui-example-sync')]",
+      "location": "[variables('location')]",
+      "properties": {
+        "runbookType": "PowerShell",
+        "description": "",
+        "publishContentLink": {
+          "uri": "https://raw.githubusercontent.com/chrisred/az-automation-gui-example/master/extras/HybridSyncJob.ps1",
+          "version": "1.0.0.0"
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Automation/automationAccounts', parameters('automationAccountName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Web/staticSites/linkedBackends",
+      "apiVersion": "2024-04-01",
+      "name": "[format('{0}/{1}', parameters('staticWebAppName'), 'backend1')]",
+      "properties": {
+        "backendResourceId": "[resourceId('Microsoft.Web/sites', parameters('functionAppName'))]",
+        "region": "[variables('location')]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/sites', parameters('functionAppName'))]",
+        "[resourceId('Microsoft.Web/staticSites', parameters('staticWebAppName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2022-04-01",
+      "scope": "[format('Microsoft.Storage/storageAccounts/{0}', parameters('storageAccountName'))]",
+      "name": "[guid(resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccountName')), resourceId('Microsoft.Automation/automationAccounts', parameters('automationAccountName')), subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'c12c1c16-33a1-487b-954d-41c89c60f349'))]",
+      "properties": {
+        "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'c12c1c16-33a1-487b-954d-41c89c60f349')]",
+        "principalId": "[reference(resourceId('Microsoft.Automation/automationAccounts', parameters('automationAccountName')), '2023-11-01', 'full').identity.principalId]",
+        "principalType": "ServicePrincipal"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Automation/automationAccounts', parameters('automationAccountName'))]",
+        "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccountName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2022-04-01",
+      "scope": "[format('Microsoft.Storage/storageAccounts/{0}', parameters('storageAccountName'))]",
+      "name": "[guid(resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccountName')), resourceId('Microsoft.Web/sites', parameters('functionAppName')), subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'b7e6dc6d-f1e8-4753-8033-0f276bb0955b'))]",
+      "properties": {
+        "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'b7e6dc6d-f1e8-4753-8033-0f276bb0955b')]",
+        "principalId": "[reference(resourceId('Microsoft.Web/sites', parameters('functionAppName')), '2024-04-01', 'full').identity.principalId]",
+        "principalType": "ServicePrincipal"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/sites', parameters('functionAppName'))]",
+        "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccountName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2022-04-01",
+      "scope": "[format('Microsoft.Automation/automationAccounts/{0}', parameters('automationAccountName'))]",
+      "name": "[guid(resourceId('Microsoft.Automation/automationAccounts', parameters('automationAccountName')), resourceId('Microsoft.Web/sites', parameters('functionAppName')), subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'acdd72a7-3385-48ef-bd42-f606fba81ae7'))]",
+      "properties": {
+        "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'acdd72a7-3385-48ef-bd42-f606fba81ae7')]",
+        "principalId": "[reference(resourceId('Microsoft.Web/sites', parameters('functionAppName')), '2024-04-01', 'full').identity.principalId]",
+        "principalType": "ServicePrincipal"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Automation/automationAccounts', parameters('automationAccountName'))]",
+        "[resourceId('Microsoft.Web/sites', parameters('functionAppName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2022-04-01",
+      "scope": "[format('Microsoft.Web/sites/{0}', parameters('functionAppName'))]",
+      "name": "[guid(resourceId('Microsoft.Web/sites', parameters('functionAppName')), resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('managedIdentityName')), subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'de139f84-1756-47ae-9be6-808fbbe84772'))]",
+      "properties": {
+        "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'de139f84-1756-47ae-9be6-808fbbe84772')]",
+        "principalId": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('managedIdentityName')), '2024-11-30').principalId]",
+        "principalType": "ServicePrincipal"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/sites', parameters('functionAppName'))]",
+        "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('managedIdentityName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.ManagedIdentity/userAssignedIdentities",
+      "apiVersion": "2024-11-30",
+      "name": "[parameters('managedIdentityName')]",
+      "location": "[variables('location')]"
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts",
+      "apiVersion": "2024-01-01",
+      "name": "[parameters('storageAccountName')]",
+      "location": "[variables('location')]",
+      "sku": {
+        "name": "Standard_LRS"
+      },
+      "kind": "StorageV2"
+    },
+    {
+      "type": "Microsoft.Automation/automationAccounts",
+      "apiVersion": "2023-11-01",
+      "name": "[parameters('automationAccountName')]",
+      "location": "[variables('location')]",
+      "identity": {
+        "type": "SystemAssigned"
+      },
+      "properties": {
+        "sku": {
+          "name": "Basic"
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Web/serverfarms",
+      "apiVersion": "2024-04-01",
+      "name": "[parameters('appServicePlanName')]",
+      "location": "[variables('location')]",
+      "sku": {
+        "name": "FC1",
+        "tier": "FlexConsumption"
+      },
+      "kind": "functionapp",
+      "properties": {
+        "reserved": true,
+        "zoneRedundant": false
+      }
+    },
+    {
+      "type": "Microsoft.Web/sites",
+      "apiVersion": "2024-04-01",
+      "name": "[parameters('functionAppName')]",
+      "location": "[variables('location')]",
+      "kind": "functionapp,linux",
+      "identity": {
+        "type": "SystemAssigned"
+      },
+      "properties": {
+        "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', parameters('appServicePlanName'))]",
+        "functionAppConfig": {
+          "runtime": {
+            "name": "python",
+            "version": "3.10"
+          },
+          "deployment": {
+            "storage": {
+              "type": "blobContainer",
+              "value": "[format('{0}app-package-{1}-{2}', reference(resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccountName')), '2024-01-01').primaryEndpoints.blob, parameters('functionAppName'), variables('uniqueName'))]",
+              "authentication": {
+                "type": "SystemAssignedIdentity"
+              }
+            }
+          },
+          "scaleAndConcurrency": {
+            "instanceMemoryMB": 512,
+            "maximumInstanceCount": 100
+          }
+        },
+        "siteConfig": {
+          "appSettings": [
+            {
+              "name": "AzureWebJobsStorage__credential",
+              "value": "managedidentity"
+            },
+            {
+              "name": "AzureWebJobsStorage__accountName",
+              "value": "[parameters('storageAccountName')]"
+            },
+            {
+              "name": "AzureWebJobsStorage__blobServiceUri",
+              "value": "[reference(resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccountName')), '2024-01-01').primaryEndpoints.blob]"
+            },
+            {
+              "name": "AzureWebJobsStorage__queueServiceUri",
+              "value": "[reference(resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccountName')), '2024-01-01').primaryEndpoints.queue]"
+            },
+            {
+              "name": "AzureWebJobsStorage__tableServiceUri",
+              "value": "[reference(resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccountName')), '2024-01-01').primaryEndpoints.table]"
+            },
+            {
+              "name": "AZURE_SUBSCRIPTION_ID",
+              "value": "[subscription().subscriptionId]"
+            },
+            {
+              "name": "AUTOMATION_ACCOUNT_NAME",
+              "value": "[parameters('automationAccountName')]"
+            },
+            {
+              "name": "AUTOMATION_GROUP_NAME",
+              "value": "[resourceGroup().name]"
+            },
+            {
+              "name": "WEBHOOK_RUNBOOK",
+              "value": "[reference('automation-gui-example-api').uri]"
+            },
+            {
+              "name": "WEBHOOK_HYBRID",
+              "value": "[reference('automation-gui-example-hybrid-api').uri]"
+            }
+          ]
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/serverfarms', parameters('appServicePlanName'))]",
+        "[resourceId('Microsoft.Automation/automationAccounts/webhooks', parameters('automationAccountName'), 'automation-gui-example-hybrid-api')]",
+        "[resourceId('Microsoft.Automation/automationAccounts/webhooks', parameters('automationAccountName'), 'automation-gui-example-api')]",
+        "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccountName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Web/staticSites",
+      "apiVersion": "2024-04-01",
+      "name": "[parameters('staticWebAppName')]",
+      "location": "[parameters('staticWebAppRegion')]",
+      "sku": {
+        "name": "Standard",
+        "tier": "Standard"
+      },
+      "properties": {
+        "repositoryUrl": "[parameters('githubRepositoryURL')]",
+        "branch": "master",
+        "stagingEnvironmentPolicy": "Enabled",
+        "allowConfigFileUpdates": true,
+        "provider": "GitHub",
+        "enterpriseGradeCdnStatus": "Disabled"
+      }
+    }
+  ]
+}
